@@ -1,7 +1,9 @@
 from utils.localDataManager import getGames, getGameFile
 from utils.utils import Utils
-gameOn = True
+
+
 logging: bool = True
+
 def log(log: str) -> None:
     if logging:
         print(log)
@@ -32,7 +34,7 @@ class Mem:
         i = 0
         while i < len(gameData):
             binArray = list(str(bin(gameData[i]))[2:])
-            self.mem[i * 8 : i * 8 + len(binArray)] = binArray
+            self.mem[i * 8 + 8 - len(binArray) : i * 8 + 8 ] = binArray
 
             i += 1
 
@@ -48,6 +50,7 @@ class Mem:
         return allVarsFormated
 
 def loop():
+    gameOn = True
     while gameOn: 
         #récupère l'instruction à effectuer
         pc = Mem.getInstance().pc
