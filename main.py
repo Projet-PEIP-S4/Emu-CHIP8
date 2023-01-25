@@ -1,5 +1,6 @@
 from utils.localDataManager import getGames, getGameFile
-
+from utils.utils import Utils
+gameOn = True
 logging: bool = True
 def log(log: str) -> None:
     if logging:
@@ -46,9 +47,24 @@ class Mem:
 
         return allVarsFormated
 
+def loop():
+    while gameOn: 
+        #récupère l'instruction à effectuer
+        pc = Mem.getInstance().pc
+        instructionArray = Mem.getInstance().mem[pc : pc + 16]
+        instruction =  Utils.convertBinArrayToHexStr(instructionArray[0:8]) + Utils.convertBinArrayToHexStr(instructionArray[8:16]) 
+        print(instruction)
+        gameOn = False
+        #execution la commande
+        #incrémente le pc
+
+
+
+
 def main():
     fileData = getGameFile("MISSILE")
-
+    
     Mem.getInstance().fillMemory(fileData)
+    loop()
 
 main()
