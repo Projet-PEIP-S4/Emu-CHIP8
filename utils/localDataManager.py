@@ -7,6 +7,7 @@ def getGames():
 
     os.chdir("games") # Change path
     dirFileNamesList = os.listdir() # Read all files names in current path
+    os.chdir("../") # Change path
 
     return dirFileNamesList
 
@@ -17,7 +18,7 @@ def getGameFile(fileName):
         - fileName: string, name of the file
     """
 
-    file = open(fileName, "rb")
+    file = open("./games/" + fileName, "rb")
     fileContent = file.read()
     file.close()
 
