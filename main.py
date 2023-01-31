@@ -32,7 +32,7 @@ class Mem:
     def fillMemory(self, gameData: str) -> None:
         i = 0
         while i < len(gameData):
-            binArray = list(str(bin(gameData[i]))[2:])
+            binArray = list(str(bin(gameData[i])))
             self.mem[i * 8 + 8 - len(binArray) : i * 8 + 8 ] = binArray
 
             i += 1
