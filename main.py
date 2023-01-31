@@ -1,7 +1,6 @@
 from utils.localDataManager import getGames, getGameFile
 from utils.utils import Utils
 
-
 logging: bool = True
 
 def log(log: str) -> None:
@@ -91,11 +90,8 @@ def loop():
         #incrémente le pc
 
 
-
-
 def main():
     fileData = getGameFile("MISSILE")
-    
     Mem.getInstanceMem().fillMemory(fileData)
     loop()
 
