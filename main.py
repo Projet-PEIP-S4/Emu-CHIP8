@@ -64,6 +64,12 @@ class Mem:
         except Exception as e:
             print("Memory overflow error.")
 
+    def getpointedMemory(offset = 0):
+        return self.mem[self.pc + offset]
+
+    def getValuesAt(address):
+        return self.mem[address]
+
     def __str__(self):
         allVarsFormated: str = ""
 
@@ -142,7 +148,7 @@ def loop():
 
     while gameOn: 
         # Get the current instruction to execute
-        instruction = (mem.mem[mem.pc] << 8) + mem.mem[mem.pc + 1]
+        instruction = (mem.getpointedMemory() << 8) + mem.getpointedMemory(1)
         log(hex(instruction))
 
         # Tell the CPU to decode the instruction
@@ -155,7 +161,7 @@ def main():
     fileData = getGameFile("MISSILE")
     
     Mem.getInstance().fillMemory(fileData)
-    CPU.getInstance()
+    CPU.getInstance() # Init CPU class
 
     loop()
 
