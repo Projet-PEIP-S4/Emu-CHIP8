@@ -59,10 +59,8 @@ class Mem:
         """
 
         try:
-            i = 0
-            while i < len(gameData):
-                self.mem[i + self.dataOffset] = gameData[i]
-                i += 1
+            for index, value in enumerate(gameData):
+                self.mem[index + self.dataOffset] = value
         except Exception as e:
             print("Memory overflow error.")
 
