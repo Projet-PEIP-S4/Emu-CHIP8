@@ -116,6 +116,11 @@ class CPU:
             0x7: self._7XNN,
             0xA: self._ANNN,
             0xD: self._DXYN,
+            0xF: self._FXNN,
+        }
+
+        self.fTable = {
+            0x15: self._FX15,
         }
 
         self.reset()
@@ -200,7 +205,11 @@ class CPU:
             for i in range(0, 8):
                 dm.drawPixel(xOffset + i, yOffset + n, binString[i])
 
+    def _FXNN(self):
+        self.fTable[(self.vy << 4) + self.n]()
 
+    def _FX15(self):
+        Mem.getInstance().dt = Mem.getInstance().registers[self.vx]
         
     def __str__(self) -> str:
         allVarsFormated: str = ""
@@ -220,8 +229,6 @@ def loop():
 
     dm.clear()
 
-
-
     while gameOn: 
         # Get the current instruction to execute
         instruction = (mem.getpointedMemory() << 8) + mem.getpointedMemory(1)
@@ -239,7 +246,7 @@ def loop():
         # Update the screen
         dm.update()
         
-        time.sleep(1)
+        time.sleep(0.1)
 
 def main():
     fileData = getGameFile("MISSILE")
