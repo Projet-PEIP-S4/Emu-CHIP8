@@ -191,6 +191,9 @@ def loop():
 
     mem = Mem.getInstance()
     cpu = CPU.getInstance()
+    dm = DisplayManager().getInstance()
+
+    dm.clear()
 
     while gameOn: 
         # Get the current instruction to execute
@@ -205,6 +208,9 @@ def loop():
 
         # Increment the pc if needed
         mem.updatePC()
+
+        # Update the screen
+        dm.update()
 
 def main():
     fileData = getGameFile("MISSILE")
