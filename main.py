@@ -52,7 +52,19 @@ class Mem:
         self.dt = 0 # Delay timer register
 
     def fillMemory(self, gameData: str) -> None:
-        
+        """
+            Fill the game memory with gameData content.
+
+            gameData: string of hex numbers
+        """
+
+        try:
+            i = 0
+            while i < len(gameData):
+                self.mem[i + self.dataOffset] = gameData[i]
+                i += 1
+        except Exception as e:
+            print("Memory overflow error.")
 
     def __str__(self):
         allVarsFormated: str = ""
