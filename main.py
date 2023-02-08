@@ -110,11 +110,11 @@ class CPU:
 
         self.lookupTable = {
             0x1: self._1NNN,
-
+            0x3: self._3XNN,
+            0x4: self._4XNN,
             0x6: self._6XNN,
-
+            0x7: self._7XNN,
             0xA: self._ANNN,
-
             0xD: self._DXYN,
         }
 
@@ -150,6 +150,22 @@ class CPU:
 
         Mem.getInstance().pc = (self.vx << 8) + (self.vy << 4) + self.n
         Mem.getInstance().freezePC()
+    
+    def _3XNN(self):
+        """
+            if vx != NN then
+        """
+
+        if Mem.getInstance().registers[self.vx] == (self.vy << 4) + self.n:
+            Mem.getInstance().pc += 2 
+    
+    def _4XNN(self):
+        """
+            if vx == NN then
+        """
+
+        if Mem.getInstance().registers[self.vx] != (self.vy << 4) + self.n:
+            Mem.getInstance().pc += 2
 
     def _6XNN(self):
         """
@@ -157,6 +173,13 @@ class CPU:
         """
 
         Mem.getInstance().registers[self.vx] = (self.vy << 4) + self.n
+
+    def _7XNN(self):
+        """
+            vx += NN
+        """
+
+        Mem.getInstance().registers[self.vx] += (self.vy << 4) + self.n
 
     def _ANNN(self):
         """
@@ -176,6 +199,8 @@ class CPU:
             binString = format(mem.mem[mem.i +n], "08b")
             for i in range(0, 8):
                 dm.drawPixel(xOffset + i, yOffset + n, binString[i])
+
+
         
     def __str__(self) -> str:
         allVarsFormated: str = ""
@@ -195,6 +220,8 @@ def loop():
 
     dm.clear()
 
+
+
     while gameOn: 
         # Get the current instruction to execute
         instruction = (mem.getpointedMemory() << 8) + mem.getpointedMemory(1)
@@ -211,6 +238,8 @@ def loop():
 
         # Update the screen
         dm.update()
+        
+        time.sleep(1)
 
 def main():
     fileData = getGameFile("MISSILE")
