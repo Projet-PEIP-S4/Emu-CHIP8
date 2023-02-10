@@ -1,6 +1,8 @@
 import traceback
 import time
 
+import pygame
+
 from utils.localDataManager import getGames, getGameFile
 from utils.displayManager import DisplayManager
 from utils.utils import Utils
@@ -50,6 +52,7 @@ class Mem:
         self.sp = 0 # Stack pointer
         self.i = 0 # Draw offset register
 
+        self.instructionCode = ""
         self.incrementPC = True
 
         self.st = 0 # Sound timer register
@@ -77,11 +80,24 @@ class Mem:
 
         self.incrementPC = True
 
+    def decrementTimers(self):
+        if self.st > 0:
+            self.st -= 1
+
+        if self.dt > 0:
+            self.dt -= 1
+
     def getpointedMemory(self, offset = 0):
         return self.mem[self.pc + offset]
 
     def getValuesAt(self, address):
         return self.mem[address]
+
+    def getCurrentInstruction(self):
+        instruction = (self.getpointedMemory() << 8) + self.getpointedMemory(1)
+        self.instructionCode = hex(instruction)
+
+        return instruction
 
     def __str__(self):
         allVarsFormated: str = ""
@@ -114,13 +130,28 @@ class CPU:
             0x4: self._4XNN,
             0x6: self._6XNN,
             0x7: self._7XNN,
+            0x8: self._8XYN,
             0xA: self._ANNN,
             0xD: self._DXYN,
+            0xE: self._EXNN,
             0xF: self._FXNN,
         }
 
+        self.hTable = {
+            0x0: self._8XY0,
+        }
+
         self.fTable = {
+            0x07: self._FX07,
             0x15: self._FX15,
+            0x33: self._FX33,
+        }
+
+        self.keyTable = {
+            0x0: pygame.K_a,
+            0x1: pygame.K_z,
+            0x2: pygame.K_e,
+            0x3: pygame.K_r,
         }
 
         self.reset()
@@ -186,6 +217,23 @@ class CPU:
 
         Mem.getInstance().registers[self.vx] += (self.vy << 4) + self.n
 
+        if Mem.getInstance().registers[self.vx] > 0xFF:
+            Mem.getInstance().registers[self.vx] -= 0x100
+
+    def _8XYN(self):
+        """
+            Instruction type 8 
+        """
+
+        self.hTable[self.n]()
+
+    def _8XY0(self):
+        """
+            vx := vy
+        """
+
+        Mem.getInstance().registers[self.vx] = Mem.getInstance().registers[self.vy]
+
     def _ANNN(self):
         """
             i := NNN
@@ -200,22 +248,65 @@ class CPU:
         xOffset = mem.registers[self.vx]
         yOffset = mem.registers[self.vy]
 
+        mem.registers[15] = 0 # Reset last register
+
         for n in range(0, self.n):
-            binString = format(mem.mem[mem.i +n], "08b")
+            binString = format(mem.getValuesAt(mem.i + n), "08b")
             for i in range(0, 8):
-                dm.drawPixel(xOffset + i, yOffset + n, binString[i])
+                result = dm.drawPixel(xOffset + i, yOffset + n, binString[i])
+
+                if result == 1:
+                    mem.registers[15] = 1
+
+    def _EXNN(self):
+        """
+            Related to key event
+        """
+
+        events = pygame.event.get()
+        keys = pygame.key.get_pressed()
+
+        if self.vy == 9:
+            """
+                if key not pressed then
+            """
+
+            if keys[self.keyTable[self.vx]]:
+                Mem.getInstance().pc += 2
+
+        if self.vy == 11:
+            a = "&" + 1
 
     def _FXNN(self):
+        """
+            Instruction type F
+        """
+
         self.fTable[(self.vy << 4) + self.n]()
 
+    def _FX07(self):
+        """
+            vx := delay
+        """
+
+        Mem.getInstance().registers[self.vx] = Mem.getInstance().dt
+
     def _FX15(self):
+        """
+            delay := vx
+        """
+
         Mem.getInstance().dt = Mem.getInstance().registers[self.vx]
+
+    def _FX33(self):
+        pass
         
     def __str__(self) -> str:
         allVarsFormated: str = ""
 
         log("CPU class instance:")
         for var in vars(self):
+            if var == "lookupTable" or var == "fTable" or var == "hTable": continue
             allVarsFormated += "  -" + var + ": " + str(self.__dict__[var]) + "\n"
 
         return allVarsFormated
@@ -227,12 +318,11 @@ def loop():
     cpu = CPU.getInstance()
     dm = DisplayManager().getInstance()
 
-    dm.clear()
+    timer = pygame.time.Clock()
 
-    while gameOn: 
+    while gameOn:
         # Get the current instruction to execute
-        instruction = (mem.getpointedMemory() << 8) + mem.getpointedMemory(1)
-        log(hex(instruction))
+        instruction = mem.getCurrentInstruction()
 
         # Tell the CPU to decode the instruction
         cpu.decode(instruction)
@@ -245,8 +335,11 @@ def loop():
 
         # Update the screen
         dm.update()
-        
-        time.sleep(0.1)
+
+        # log(mem.instructionCode)
+
+        mem.decrementTimers()
+        timer.tick(100)
 
 def main():
     fileData = getGameFile("MISSILE")
@@ -255,10 +348,6 @@ def main():
     CPU.getInstance() # Init CPU class
 
     display = DisplayManager.getInstance() # Init display
-
-    # display.clear()
-    # display.drawPixel(5, 5)
-    # display.update()
 
     loop()
 
