@@ -47,6 +47,27 @@ class Mem:
         self.mem = bytearray(4096)
         self.dataOffset = 0x200
 
+        self.fonts = [
+            0xF0, 0x90, 0x90, 0x90, 0xF0, # 0
+            0x20, 0x60, 0x20, 0x20, 0x70, # 1
+            0xF0, 0x10, 0xF0, 0x80, 0xF0, # 2
+            0xF0, 0x10, 0xF0, 0x10, 0xF0, # 3
+            0x90, 0x90, 0xF0, 0x10, 0x10, # 4
+            0xF0, 0x80, 0xF0, 0x10, 0xF0, # 5
+            0xF0, 0x80, 0xF0, 0x90, 0xF0, # 6
+            0xF0, 0x10, 0x20, 0x40, 0x40, # 7
+            0xF0, 0x90, 0xF0, 0x90, 0xF0, # 8
+            0xF0, 0x90, 0xF0, 0x10, 0xF0, # 9
+            0xF0, 0x90, 0xF0, 0x90, 0x90, # A
+            0xE0, 0x90, 0xE0, 0x90, 0xE0, # B
+            0xF0, 0x80, 0x80, 0x80, 0xF0, # C
+            0xE0, 0x90, 0x90, 0x90, 0xE0, # D
+            0xF0, 0x80, 0xF0, 0x80, 0xF0, # E
+            0xF0, 0x80, 0xF0, 0x80, 0x80  # F
+        ]
+
+        self.loadFonts()
+
         self.registers = [0] * 16 # Genral purpose registers
         self.pc = self.dataOffset # Programm counter
         self.sp = 0 # Stack pointer
@@ -57,6 +78,14 @@ class Mem:
 
         self.st = 0 # Sound timer register
         self.dt = 0 # Delay timer register
+
+    def loadFonts(self):
+        """
+            Load fonts into memory starting at 0x0
+        """
+
+        for index, value in enumerate(self.fonts):
+            self.mem[index] = value
 
     def fillMemory(self, gameData: str) -> None:
         """
@@ -144,6 +173,7 @@ class CPU:
         self.fTable = {
             0x07: self._FX07,
             0x15: self._FX15,
+            0x29: self._FX29,
             0x33: self._FX33,
             0x65: self._FX65
         }
@@ -298,6 +328,13 @@ class CPU:
         """
 
         Mem.getInstance().dt = Mem.getInstance().registers[self.vx]
+
+    def _FX29(self):
+        """
+            Set i to the start location of the fonts for 
+        """
+
+        Mem.getInstance().i = Mem.getInstance().registers[self.vx] * 5
 
     def _FX33(self):
         pass
