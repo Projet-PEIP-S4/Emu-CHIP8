@@ -337,7 +337,13 @@ class CPU:
         Mem.getInstance().i = Mem.getInstance().registers[self.vx] * 5
 
     def _FX33(self):
-        pass
+        mem = Mem.getInstance()
+        valeur_vx = Mem.getInstance().registers[self.vx]
+        mem.mem[mem.i] = int(valeur_vx / 100)
+        mem.mem[mem.i +1] = int((valeur_vx % 100) / 10)
+        mem.mem[mem.i +2] = int((valeur_vx % 100) % 10 )
+
+        #print(Mem.getInstance().mem[mem.i], Mem.getInstance().mem[mem.i+1], Mem.getInstance().mem[mem.i+2])
 
     def _FX65(self):
         for j in range(self.vx+1):
@@ -382,7 +388,7 @@ def loop():
         # log(mem.instructionCode)
 
         mem.decrementTimers()
-        timer.tick(100)
+        timer.tick(500)
 
 def main():
     fileData = getGameFile("MISSILE")
