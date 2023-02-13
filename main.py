@@ -145,6 +145,7 @@ class CPU:
             0x07: self._FX07,
             0x15: self._FX15,
             0x33: self._FX33,
+            0x65: self._FX65
         }
 
         self.keyTable = {
@@ -300,6 +301,11 @@ class CPU:
 
     def _FX33(self):
         pass
+
+    def _FX65(self):
+        for j in range(self.vx+1):
+            Mem.getInstance().registers[j] = Mem.getInstance().mem[Mem.getInstance().i + j]
+        
         
     def __str__(self) -> str:
         allVarsFormated: str = ""
