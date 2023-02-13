@@ -391,7 +391,7 @@ def loop():
         timer.tick(500)
 
 def main():
-    fileData = getGameFile("MISSILE")
+    fileData = getGameFile("PONG")
     
     Mem.getInstance().fillMemory(fileData)
     CPU.getInstance() # Init CPU class
