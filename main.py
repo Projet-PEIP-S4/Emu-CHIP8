@@ -5,7 +5,6 @@ import pygame
 
 from utils.localDataManager import getGames, getGameFile
 from utils.displayManager import DisplayManager
-from utils.utils import Utils
 
 gameOn: bool = True # Control wether the game is running or not
 logging: bool = True # Set to True to enable logging message into console
