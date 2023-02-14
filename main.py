@@ -1,5 +1,10 @@
 import traceback
 import time
+import random
+import os
+
+# Disable pygame print
+os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 
 import pygame
 
@@ -68,6 +73,7 @@ class Mem:
         self.loadFonts()
 
         self.registers = [0] * 16 # Genral purpose registers
+        self.stack = [0] * 16
         self.pc = self.dataOffset # Programm counter
         self.sp = 0 # Stack pointer
         self.i = 0 # Draw offset register
@@ -153,13 +159,17 @@ class CPU:
         log("New CPU instance")
 
         self.lookupTable = {
+            0x0: self._00NN,
             0x1: self._1NNN,
+            0x2: self._2NNN,
             0x3: self._3XNN,
             0x4: self._4XNN,
             0x6: self._6XNN,
             0x7: self._7XNN,
             0x8: self._8XYN,
+            0x9: self._9XY0,
             0xA: self._ANNN,
+            0xC: self._CXNN,
             0xD: self._DXYN,
             0xE: self._EXNN,
             0xF: self._FXNN,
@@ -167,14 +177,18 @@ class CPU:
 
         self.hTable = {
             0x0: self._8XY0,
+            0x2: self._8XY2,
+            0x4: self._8XY4,
+            0x5: self._8XY5,
         }
 
         self.fTable = {
             0x07: self._FX07,
             0x15: self._FX15,
+            0x18: self._FX18,
             0x29: self._FX29,
             0x33: self._FX33,
-            0x65: self._FX65
+            0x65: self._FX65,
         }
 
         self.keyTable = {
@@ -209,6 +223,15 @@ class CPU:
     def exec(self):
         self.lookupTable[self.code]()
 
+    def _00NN(self):
+        if self.n == 0:
+            a = "&" + 1
+
+        if self.n == 14:
+            Mem.getInstance().sp -= 1
+            Mem.getInstance().pc = Mem.getInstance().stack[Mem.getInstance().sp]
+            Mem.getInstance().stack[Mem.getInstance().sp] = 0
+
     def _1NNN(self):
         """
             Jump to NNN
@@ -216,6 +239,15 @@ class CPU:
 
         Mem.getInstance().pc = (self.vx << 8) + (self.vy << 4) + self.n
         Mem.getInstance().freezePC()
+
+    def _2NNN(self):
+        """
+            Call subroutine
+        """
+
+        Mem.getInstance().stack[Mem.getInstance().sp] = Mem.getInstance().pc
+        Mem.getInstance().sp += 1
+        Mem.getInstance().pc = (self.vx << 8) + (self.vy << 4) + self.n
     
     def _3XNN(self):
         """
@@ -264,12 +296,61 @@ class CPU:
 
         Mem.getInstance().registers[self.vx] = Mem.getInstance().registers[self.vy]
 
+    def _8XY2(self):
+        """
+            vx &= vy
+        """
+
+        Mem.getInstance().registers[self.vx] &= Mem.getInstance().registers[self.vy]
+
+    def _8XY4(self):
+        """
+            vx += vy and vf = 1 on carry
+        """
+
+        Mem.getInstance().registers[-1] = 0
+
+        if Mem.getInstance().registers[self.vx] + Mem.getInstance().registers[self.vy] > 0xff:
+            Mem.getInstance().registers[-1] = 1
+
+        Mem.getInstance().registers[self.vx] += Mem.getInstance().registers[self.vy]
+        Mem.getInstance().registers[self.vx] &= 0xff
+
+    def _8XY5(self):
+        """
+            vx -= vy and vf = 0 on borrow
+        """
+
+        Mem.getInstance().registers[-1] = 1
+
+        if Mem.getInstance().registers[self.vx] < Mem.getInstance().registers[self.vy]:
+            Mem.getInstance().registers[-1] = 0
+
+        Mem.getInstance().registers[self.vx] -= Mem.getInstance().registers[self.vy]
+        Mem.getInstance().registers[self.vx] &= 0xff
+
+    def _9XY0(self):
+        """
+            If vx == vy then
+        """
+
+        if Mem.getInstance().registers[self.vx] != Mem.getInstance().registers[self.vy]:
+            Mem.getInstance().pc += 2
+
     def _ANNN(self):
         """
             i := NNN
         """
 
         Mem.getInstance().i = (self.vx << 8) + (self.vy << 4) + self.n
+
+    def _CXNN(self):
+        """
+            Random number between 0 and 255 loaded into vx
+        """
+
+        rint = random.randint(0, 255)
+        Mem.getInstance().registers[self.vx] = rint & ((self.vy << 4) + self.n)
 
     def _DXYN(self):
         mem = Mem.getInstance()
@@ -328,26 +409,39 @@ class CPU:
 
         Mem.getInstance().dt = Mem.getInstance().registers[self.vx]
 
+    def _FX18(self):
+        """
+            Buzzer
+        """
+
+        Mem.getInstance().st = Mem.getInstance().registers[self.vx]
+
     def _FX29(self):
         """
-            Set i to the start location of the fonts for 
+            Set i to the start location of the fonts for vx
         """
 
         Mem.getInstance().i = Mem.getInstance().registers[self.vx] * 5
 
     def _FX33(self):
-        mem = Mem.getInstance()
-        valeur_vx = Mem.getInstance().registers[self.vx]
-        mem.mem[mem.i] = int(valeur_vx / 100)
-        mem.mem[mem.i +1] = int((valeur_vx % 100) / 10)
-        mem.mem[mem.i +2] = int((valeur_vx % 100) % 10 )
+        """
+            Decode vx into binary-coded decimal
+        """
 
-        #print(Mem.getInstance().mem[mem.i], Mem.getInstance().mem[mem.i+1], Mem.getInstance().mem[mem.i+2])
+        mem = Mem.getInstance()
+        vx = Mem.getInstance().registers[self.vx]
+
+        mem.mem[mem.i] = vx // 100
+        mem.mem[mem.i +1] = (vx % 100) // 10
+        mem.mem[mem.i +2] = vx % 10
 
     def _FX65(self):
-        for j in range(self.vx+1):
+        """
+            Load v0-vx from i through (i+x)
+        """
+
+        for j in range(self.vx + 1):
             Mem.getInstance().registers[j] = Mem.getInstance().mem[Mem.getInstance().i + j]
-        
         
     def __str__(self) -> str:
         allVarsFormated: str = ""

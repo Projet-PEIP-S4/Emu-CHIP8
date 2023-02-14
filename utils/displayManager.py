@@ -55,11 +55,11 @@ class DisplayManager:
         x = x * self.pixelWidth
         y = y * self.pixelHeight
 
-        # if x > self.width: # Need to be tested
-        #     x -= self.width
+        if x >= self.width: # Need to be tested
+            x -= self.width
 
-        # if y > self.height: # Need to be tested
-        #     y -= self.height
+        if y >= self.height: # Need to be tested
+            y -= self.height
 
         actPixel = self.getPixel(x, y)
         newColor = self.black if actPixel ^ int(colorMode) else self.white # XOR
