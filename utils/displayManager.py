@@ -51,20 +51,22 @@ class DisplayManager:
         if pixel_color[:3] == self.white: return 0
         else: return 1
 
-    def drawPixel(self, x, y, colorMode):
-        x = x * self.pixelWidth
-        y = y * self.pixelHeight
+    def drawPixel(self, gameX, gameY, colorMode):
+        print(gameX)
 
-        if x >= self.width: # Need to be tested
-            x -= self.width
+        screenX = gameX * self.pixelWidth
+        screenY = gameY * self.pixelHeight
 
-        if y >= self.height: # Need to be tested
-            y -= self.height
+        if screenX >= self.width: # Need to be tested
+            screenX = screenX % self.width
 
-        actPixel = self.getPixel(x, y)
+        if screenY >= self.height: # Need to be tested
+            screenY = screenY % self.height
+
+        actPixel = self.getPixel(screenX, screenY)
         newColor = self.black if actPixel ^ int(colorMode) else self.white # XOR
 
-        pygame.draw.rect(self.display, newColor, (x, y, self.pixelWidth, self.pixelHeight))
+        pygame.draw.rect(self.display, newColor, (screenX, screenY, self.pixelWidth, self.pixelHeight))
 
         if actPixel == 1 and newColor == self.white:
             return 1

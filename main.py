@@ -189,6 +189,7 @@ class CPU:
             0x29: self._FX29,
             0x33: self._FX33,
             0x65: self._FX65,
+            0x1E: self._FX1E,
         }
 
         self.keyTable = {
@@ -295,6 +296,7 @@ class CPU:
         """
 
         Mem.getInstance().registers[self.vx] = Mem.getInstance().registers[self.vy]
+        Mem.getInstance().registers[self.vx] &= 0xff
 
     def _8XY2(self):
         """
@@ -302,16 +304,17 @@ class CPU:
         """
 
         Mem.getInstance().registers[self.vx] &= Mem.getInstance().registers[self.vy]
+        Mem.getInstance().registers[self.vx] &= 0xff
 
     def _8XY4(self):
         """
             vx += vy and vf = 1 on carry
         """
 
-        Mem.getInstance().registers[-1] = 0
+        Mem.getInstance().registers[15] = 0
 
         if Mem.getInstance().registers[self.vx] + Mem.getInstance().registers[self.vy] > 0xff:
-            Mem.getInstance().registers[-1] = 1
+            Mem.getInstance().registers[15] = 1
 
         Mem.getInstance().registers[self.vx] += Mem.getInstance().registers[self.vy]
         Mem.getInstance().registers[self.vx] &= 0xff
@@ -321,10 +324,10 @@ class CPU:
             vx -= vy and vf = 0 on borrow
         """
 
-        Mem.getInstance().registers[-1] = 1
+        Mem.getInstance().registers[15] = 1
 
         if Mem.getInstance().registers[self.vx] < Mem.getInstance().registers[self.vy]:
-            Mem.getInstance().registers[-1] = 0
+            Mem.getInstance().registers[15] = 0
 
         Mem.getInstance().registers[self.vx] -= Mem.getInstance().registers[self.vy]
         Mem.getInstance().registers[self.vx] &= 0xff
@@ -343,6 +346,7 @@ class CPU:
         """
 
         Mem.getInstance().i = (self.vx << 8) + (self.vy << 4) + self.n
+        Mem.getInstance().i &= 0xfff
 
     def _CXNN(self):
         """
@@ -351,6 +355,7 @@ class CPU:
 
         rint = random.randint(0, 255)
         Mem.getInstance().registers[self.vx] = rint & ((self.vy << 4) + self.n)
+        Mem.getInstance().registers[self.vx] &= 0xff
 
     def _DXYN(self):
         mem = Mem.getInstance()
@@ -442,6 +447,20 @@ class CPU:
 
         for j in range(self.vx + 1):
             Mem.getInstance().registers[j] = Mem.getInstance().mem[Mem.getInstance().i + j]
+
+        Mem.getInstance().i += self.vx + 1
+
+    def _FX1E(self):
+        """
+            i += vx
+        """
+
+        Mem.getInstance().i += Mem.getInstance().registers[self.vx]
+        Mem.getInstance().registers[15] = 0
+
+        if Mem.getInstance().i > 0xfff:
+            Mem.getInstance().registers[15] = 1
+            Mem.getInstance().i &= 0xfff
         
     def __str__(self) -> str:
         allVarsFormated: str = ""
@@ -484,7 +503,7 @@ def loop():
         timer.tick(500)
 
 def main():
-    fileData = getGameFile("PONG")
+    fileData = getGameFile("TETRIS")
     
     Mem.getInstance().fillMemory(fileData)
     CPU.getInstance() # Init CPU class
