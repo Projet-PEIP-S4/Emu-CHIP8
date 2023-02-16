@@ -1,5 +1,4 @@
 import traceback
-
 import pygame
 
 class DisplayManager:

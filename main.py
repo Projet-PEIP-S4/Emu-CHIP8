@@ -2,6 +2,7 @@ import traceback
 import time
 import random
 import os
+from Menu import menu
 
 # Disable pygame print
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
@@ -226,7 +227,8 @@ class CPU:
 
     def _00NN(self):
         if self.n == 0:
-            a = "&" + 1
+            #a = "&" + 1
+            pass
 
         if self.n == 14:
             Mem.getInstance().sp -= 1
@@ -503,7 +505,8 @@ def loop():
         timer.tick(500)
 
 def main():
-    fileData = getGameFile("TETRIS")
+    game_name = menu()
+    fileData = getGameFile(game_name)
     
     Mem.getInstance().fillMemory(fileData)
     CPU.getInstance() # Init CPU class
