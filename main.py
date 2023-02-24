@@ -2,15 +2,16 @@ import traceback
 import time
 import random
 import os
-from Menu import menu
 
-# Disable pygame print
+# Disable pygame init print
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 
 import pygame
 
 from utils.localDataManager import getGames, getGameFile
 from utils.displayManager import DisplayManager
+
+from Menu import menu
 
 gameOn: bool = True # Control wether the game is running or not
 logging: bool = True # Set to True to enable logging message into console
@@ -43,14 +44,16 @@ class Mem:
         log("New memory instance")
         
         self.reset()
+        self.loadFonts()
 
     def reset(self) -> None:
         """
             Reset all variables to their default state.
         """
 
-        self.mem = bytearray(4096)
-        self.dataOffset = 0x200
+        self.mem = bytearray(4096) # Memory is composed of 4096 8-bit value
+        self.dataOffset = 0x200 # A small part at the beginnig of the memory is reserved for fonts. Actual memory start at 0x200
+        self.pc = self.dataOffset # Programm counter
 
         self.fonts = [
             0xF0, 0x90, 0x90, 0x90, 0xF0, # 0
@@ -71,16 +74,15 @@ class Mem:
             0xF0, 0x80, 0xF0, 0x80, 0x80  # F
         ]
 
-        self.loadFonts()
+        self.registers = [0] * 16 # General purpose registers
 
-        self.registers = [0] * 16 # Genral purpose registers
-        self.stack = [0] * 16
-        self.pc = self.dataOffset # Programm counter
         self.sp = 0 # Stack pointer
-        self.i = 0 # Draw offset register
+        self.stack = [0] * 16 # List of 16 8-bit adress
 
-        self.instructionCode = ""
-        self.incrementPC = True
+        self.i = 0 # General index register
+
+        self.instructionCode = "" # Plain text code instruction, used for debuging
+        self.incrementPC = True # Define whether or not the pc should be incremented
 
         self.st = 0 # Sound timer register
         self.dt = 0 # Delay timer register
@@ -160,16 +162,18 @@ class CPU:
         log("New CPU instance")
 
         self.lookupTable = {
-            0x0: self._00NN,
+            0x0: self._0NNN,
             0x1: self._1NNN,
             0x2: self._2NNN,
             0x3: self._3XNN,
             0x4: self._4XNN,
+            0x5: self._5XNN,
             0x6: self._6XNN,
             0x7: self._7XNN,
             0x8: self._8XYN,
             0x9: self._9XY0,
             0xA: self._ANNN,
+            0xB: self._BNNN,
             0xC: self._CXNN,
             0xD: self._DXYN,
             0xE: self._EXNN,
@@ -178,26 +182,48 @@ class CPU:
 
         self.hTable = {
             0x0: self._8XY0,
+            0x1: self._8XY1,
             0x2: self._8XY2,
+            0x3: self._8XY3,
             0x4: self._8XY4,
             0x5: self._8XY5,
+            0x6: self._8XY6,
+            0x7: self._8XY7,
+            0xE: self._8XYE,
         }
 
         self.fTable = {
             0x07: self._FX07,
+            0x0A: self._FX0A,
             0x15: self._FX15,
             0x18: self._FX18,
             0x29: self._FX29,
             0x33: self._FX33,
+            0x55: self._FX55,
             0x65: self._FX65,
             0x1E: self._FX1E,
         }
 
         self.keyTable = {
-            0x0: pygame.K_a,
-            0x1: pygame.K_z,
-            0x2: pygame.K_e,
-            0x3: pygame.K_r,
+            0x1: pygame.K_1,
+            0x2: pygame.K_2,
+            0x3: pygame.K_3,
+            0xc: pygame.K_4,
+
+            0x4: pygame.K_a,
+            0x5: pygame.K_z,
+            0x6: pygame.K_e,
+            0xd: pygame.K_r,
+
+            0x7: pygame.K_q,
+            0x8: pygame.K_s,
+            0x9: pygame.K_d,
+            0xe: pygame.K_f,
+
+            0xa: pygame.K_w,
+            0x0: pygame.K_x,
+            0xb: pygame.K_c,
+            0xf: pygame.K_v,
         }
 
         self.reset()
@@ -225,15 +251,25 @@ class CPU:
     def exec(self):
         self.lookupTable[self.code]()
 
-    def _00NN(self):
-        if self.n == 0:
-            #a = "&" + 1
-            pass
+    def _0NNN(self):
+        if self.vy == 14 and self.n == 0:
+            """
+                Clear the display
+            """
 
-        if self.n == 14:
+            DisplayManager.getInstance().clear()
+            DisplayManager.getInstance().shouldUpdate = True
+
+        elif self.vy == 14 and self.n == 14:
+            """
+                Exit subroutine
+            """
+
             Mem.getInstance().sp -= 1
             Mem.getInstance().pc = Mem.getInstance().stack[Mem.getInstance().sp]
-            Mem.getInstance().stack[Mem.getInstance().sp] = 0
+
+        else:
+            a = "&" + 1
 
     def _1NNN(self):
         """
@@ -251,6 +287,7 @@ class CPU:
         Mem.getInstance().stack[Mem.getInstance().sp] = Mem.getInstance().pc
         Mem.getInstance().sp += 1
         Mem.getInstance().pc = (self.vx << 8) + (self.vy << 4) + self.n
+        Mem.getInstance().freezePC()
     
     def _3XNN(self):
         """
@@ -258,7 +295,7 @@ class CPU:
         """
 
         if Mem.getInstance().registers[self.vx] == (self.vy << 4) + self.n:
-            Mem.getInstance().pc += 2 
+            Mem.getInstance().pc += 2
     
     def _4XNN(self):
         """
@@ -266,6 +303,14 @@ class CPU:
         """
 
         if Mem.getInstance().registers[self.vx] != (self.vy << 4) + self.n:
+            Mem.getInstance().pc += 2
+
+    def _5XNN(self):
+        """
+            if vx != vy then
+        """
+
+        if Mem.getInstance().registers[self.vx] == Mem.getInstance().registers[self.vy]:
             Mem.getInstance().pc += 2
 
     def _6XNN(self):
@@ -300,6 +345,14 @@ class CPU:
         Mem.getInstance().registers[self.vx] = Mem.getInstance().registers[self.vy]
         Mem.getInstance().registers[self.vx] &= 0xff
 
+    def _8XY1(self):
+        """
+            vx |= vy
+        """
+
+        Mem.getInstance().registers[self.vx] |= Mem.getInstance().registers[self.vy]
+        Mem.getInstance().registers[self.vx] &= 0xff
+
     def _8XY2(self):
         """
             vx &= vy
@@ -308,15 +361,23 @@ class CPU:
         Mem.getInstance().registers[self.vx] &= Mem.getInstance().registers[self.vy]
         Mem.getInstance().registers[self.vx] &= 0xff
 
+    def _8XY3(self):
+        """
+            vx ^= vy
+        """
+
+        Mem.getInstance().registers[self.vx] ^= Mem.getInstance().registers[self.vy]
+        Mem.getInstance().registers[self.vx] &= 0xff
+
     def _8XY4(self):
         """
             vx += vy and vf = 1 on carry
         """
 
-        Mem.getInstance().registers[15] = 0
-
-        if Mem.getInstance().registers[self.vx] + Mem.getInstance().registers[self.vy] > 0xff:
+        if Mem.getInstance().registers[self.vx] + Mem.getInstance().registers[self.vy] > 0xFF:
             Mem.getInstance().registers[15] = 1
+        else:
+            Mem.getInstance().registers[15] = 0
 
         Mem.getInstance().registers[self.vx] += Mem.getInstance().registers[self.vy]
         Mem.getInstance().registers[self.vx] &= 0xff
@@ -326,13 +387,43 @@ class CPU:
             vx -= vy and vf = 0 on borrow
         """
 
-        Mem.getInstance().registers[15] = 1
-
-        if Mem.getInstance().registers[self.vx] < Mem.getInstance().registers[self.vy]:
+        if Mem.getInstance().registers[self.vy] > Mem.getInstance().registers[self.vx]:
             Mem.getInstance().registers[15] = 0
+        else:
+            Mem.getInstance().registers[15] = 1
 
         Mem.getInstance().registers[self.vx] -= Mem.getInstance().registers[self.vy]
         Mem.getInstance().registers[self.vx] &= 0xff
+
+    def _8XY6(self):
+        """
+            vx >> 1, vf = old least significant bit
+        """
+
+        Mem.getInstance().registers[15] = Mem.getInstance().registers[self.vx] & 0x01
+        Mem.getInstance().registers[self.vx] = Mem.getInstance().registers[self.vx] >> 1
+
+    def _8XY7(self):
+        """
+            vx = vy - vx, vf = 0 on borrow
+        """
+
+        if Mem.getInstance().registers[self.vx] > Mem.getInstance().registers[self.vy]:
+            Mem.getInstance().registers[15] = 0
+        else:
+            Mem.getInstance().registers[15] = 1
+
+        Mem.getInstance().registers[self.vx] = Mem.getInstance().registers[self.vy] - Mem.getInstance().registers[self.vx]
+        Mem.getInstance().registers[self.vx] &= 0xff
+
+    def _8XYE(self):
+        """
+            vx << 1, vf = old most significant bit
+        """
+
+        Mem.getInstance().registers[15] = Mem.getInstance().registers[self.vx] >> 7
+        Mem.getInstance().registers[self.vx] = Mem.getInstance().registers[self.vx] << 1
+        Mem.getInstance().registers[self.vx] &= 0xFF
 
     def _9XY0(self):
         """
@@ -350,9 +441,17 @@ class CPU:
         Mem.getInstance().i = (self.vx << 8) + (self.vy << 4) + self.n
         Mem.getInstance().i &= 0xfff
 
+    def _BNNN(self):
+        """
+            jump0 NNN, Jump to address NNN + v0
+        """
+
+        Mem.getInstance().pc = (self.vx << 8) + (self.vy << 4) + self.n + Mem.getInstance().registers[0]
+        Mem.getInstance().freezePC()
+
     def _CXNN(self):
         """
-            Random number between 0 and 255 loaded into vx
+            Random number between 0 and 255 then XORed with NN then loaded into vx
         """
 
         rint = random.randint(0, 255)
@@ -360,16 +459,23 @@ class CPU:
         Mem.getInstance().registers[self.vx] &= 0xff
 
     def _DXYN(self):
+        """
+            Draw function
+        """
+
         mem = Mem.getInstance()
         dm = DisplayManager.getInstance()
+
+        dm.shouldUpdate = True
 
         xOffset = mem.registers[self.vx]
         yOffset = mem.registers[self.vy]
 
-        mem.registers[15] = 0 # Reset last register
-
+        mem.registers[15] = 0
+        
         for n in range(0, self.n):
             binString = format(mem.getValuesAt(mem.i + n), "08b")
+
             for i in range(0, 8):
                 result = dm.drawPixel(xOffset + i, yOffset + n, binString[i])
 
@@ -389,11 +495,20 @@ class CPU:
                 if key not pressed then
             """
 
-            if keys[self.keyTable[self.vx]]:
+            key = Mem.getInstance().registers[self.vx]
+
+            if keys[self.keyTable[key]]:
                 Mem.getInstance().pc += 2
 
-        if self.vy == 11:
-            a = "&" + 1
+        elif self.vy == 10:
+            """
+                if key is pressed then
+            """
+
+            key = Mem.getInstance().registers[self.vx]
+
+            if keys[self.keyTable[key]] == False:
+                Mem.getInstance().pc += 2
 
     def _FXNN(self):
         """
@@ -408,6 +523,13 @@ class CPU:
         """
 
         Mem.getInstance().registers[self.vx] = Mem.getInstance().dt
+
+    def _FX0A(self):
+        """
+            Wait for a keypress 
+        """
+        
+        a = "&" + 1
 
     def _FX15(self):
         """
@@ -442,15 +564,21 @@ class CPU:
         mem.mem[mem.i +1] = (vx % 100) // 10
         mem.mem[mem.i +2] = vx % 10
 
+    def _FX55(self):
+        """
+            Save v0-vx to i through (i+x)
+        """
+        
+        for j in range(0, self.vx + 1):
+            Mem.getInstance().mem[Mem.getInstance().i + j] = Mem.getInstance().registers[j]
+
     def _FX65(self):
         """
             Load v0-vx from i through (i+x)
         """
 
-        for j in range(self.vx + 1):
+        for j in range(0, self.vx + 1):
             Mem.getInstance().registers[j] = Mem.getInstance().mem[Mem.getInstance().i + j]
-
-        Mem.getInstance().i += self.vx + 1
 
     def _FX1E(self):
         """
@@ -458,11 +586,12 @@ class CPU:
         """
 
         Mem.getInstance().i += Mem.getInstance().registers[self.vx]
-        Mem.getInstance().registers[15] = 0
 
         if Mem.getInstance().i > 0xfff:
             Mem.getInstance().registers[15] = 1
             Mem.getInstance().i &= 0xfff
+        else:
+            Mem.getInstance().registers[15] = 0
         
     def __str__(self) -> str:
         allVarsFormated: str = ""
@@ -483,9 +612,12 @@ def loop():
 
     timer = pygame.time.Clock()
 
+    i = 0
     while gameOn:
         # Get the current instruction to execute
         instruction = mem.getCurrentInstruction()
+
+        # log(mem.instructionCode)
 
         # Tell the CPU to decode the instruction
         cpu.decode(instruction)
@@ -499,13 +631,15 @@ def loop():
         # Update the screen
         dm.update()
 
-        # log(mem.instructionCode)
+        if i == 9: # Timers decrement at 60hz, 540 / 9 = 60
+            mem.decrementTimers()
+            i = 0
 
-        mem.decrementTimers()
-        timer.tick(500)
+        i += 1
+        timer.tick(540)
 
 def main():
-    game_name = menu()
+    game_name = "MISSILE" #menu()
     fileData = getGameFile(game_name)
     
     Mem.getInstance().fillMemory(fileData)
@@ -517,7 +651,7 @@ def main():
 
 try: # Enable global error handling
     main()
-except Exception: # If an error occur print the error code, the Mem singleton vars content and the CPU vars content
+except Exception: # If an error occur print: the error code, the Mem vars content and the CPU vars content
     print("\n" + traceback.format_exc())
 
     log(Mem.getInstance())

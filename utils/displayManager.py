@@ -1,5 +1,5 @@
-import traceback
 import pygame
+import time
 
 class DisplayManager:
     """
@@ -34,6 +34,7 @@ class DisplayManager:
         self.pixelWidth = 20
 
         self.invert = False
+        self.shouldUpdate = False
 
         self.white = (255, 255, 255) if not self.invert else (0, 0, 0)
         self.black = (0, 0, 0) if not self.invert else (255, 255, 255)
@@ -51,15 +52,13 @@ class DisplayManager:
         else: return 1
 
     def drawPixel(self, gameX, gameY, colorMode):
-        print(gameX)
-
         screenX = gameX * self.pixelWidth
         screenY = gameY * self.pixelHeight
 
-        if screenX >= self.width: # Need to be tested
+        if screenX >= self.width:
             screenX = screenX % self.width
 
-        if screenY >= self.height: # Need to be tested
+        if screenY >= self.height:
             screenY = screenY % self.height
 
         actPixel = self.getPixel(screenX, screenY)
@@ -72,4 +71,6 @@ class DisplayManager:
         else: return 0
 
     def update(self):
-        pygame.display.flip()
+        if self.shouldUpdate:
+            pygame.display.flip()
+            self.shouldUpdate = False
