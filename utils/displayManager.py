@@ -56,10 +56,10 @@ class DisplayManager:
         screenY = gameY * self.pixelHeight
 
         if screenX >= self.width:
-            screenX = screenX % self.width
+            return 0
 
         if screenY >= self.height:
-            screenY = screenY % self.height
+            return 0
 
         actPixel = self.getPixel(screenX, screenY)
         newColor = self.black if actPixel ^ int(colorMode) else self.white # XOR

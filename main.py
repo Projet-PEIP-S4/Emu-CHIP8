@@ -528,8 +528,19 @@ class CPU:
         """
             Wait for a keypress 
         """
-        
-        a = "&" + 1
+
+        events = pygame.event.get()
+        keys = pygame.key.get_pressed()
+
+        keyPressed = False
+
+        for key in self.keyTable:
+            if keys[self.keyTable[key]]:
+                Mem.getInstance().registers[self.vx] = key
+                keyPressed = True
+
+        if keyPressed == False:
+            Mem.getInstance().freezePC()
 
     def _FX15(self):
         """
@@ -639,7 +650,7 @@ def loop():
         timer.tick(540)
 
 def main():
-    game_name = "MISSILE" #menu()
+    game_name = menu()
     fileData = getGameFile(game_name)
     
     Mem.getInstance().fillMemory(fileData)
