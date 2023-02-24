@@ -691,18 +691,31 @@ def printHowToUse():
 
     print("How to use:")
     print("- no arg --> use the library to select your game")
-    print("- game name --> bypass the menu and jump directly to the game")
+    print("- 'game name' --> bypass the menu and jump directly to the game")
+    print("- list --> list all available games")
+
     print("\n- help --> acces this menu")
+
+def printListGames():
+    games = getGames()
+
+    print("All available games are listed below:")
+    for game in games:
+        print("-", game)
 
 def main():
     emu = Emu.getInstance()
     emu.logging = True
 
     if len(sys.argv) == 2:
-        gameName = sys.argv[1]
+        firstParam = sys.argv[1]
 
-        if gameName in getGames():
-            gameRom = getGameFile(gameName)
+        if firstParam == "help":
+            printHowToUse()
+        elif firstParam == "list":
+            printListGames()
+        elif firstParam in getGames():
+            gameRom = getGameFile(firstParam)
 
             emu.setRom(gameRom)
             emu.play()
