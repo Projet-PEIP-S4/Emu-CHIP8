@@ -22,10 +22,6 @@ class DisplayManager:
 
         pygame.init()
 
-        self.openDisplay()
-        self.clear()
-        self.update()
-
     def reset(self):
         self.height = 640
         self.width = 1280
@@ -35,12 +31,26 @@ class DisplayManager:
 
         self.invert = False
         self.shouldUpdate = False
+        self.display = False
+
+        self.white = (255, 255, 255)
+        self.black = (0, 0, 0)
+
+    def invertColors(self):
+        self.invert = not self.invert
 
         self.white = (255, 255, 255) if not self.invert else (0, 0, 0)
         self.black = (0, 0, 0) if not self.invert else (255, 255, 255)
 
+        if self.display != False:
+            self.clear()
+
     def openDisplay(self):
         self.display = pygame.display.set_mode((self.width, self.height))
+        self.clear()
+
+        self.shouldUpdate = True
+        self.update()
 
     def clear(self):
         self.display.fill(self.white)
@@ -52,14 +62,14 @@ class DisplayManager:
         else: return 1
 
     def drawPixel(self, gameX, gameY, colorMode):
+        if gameX >= 64:
+            gameX = gameX % 64
+
+        if gameY >= 32:
+            return 0
+
         screenX = gameX * self.pixelWidth
         screenY = gameY * self.pixelHeight
-
-        if screenX >= self.width:
-            return 0
-
-        if screenY >= self.height:
-            return 0
 
         actPixel = self.getPixel(screenX, screenY)
         newColor = self.black if actPixel ^ int(colorMode) else self.white # XOR

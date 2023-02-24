@@ -1,48 +1,52 @@
 import pygame
+
 from utils.localDataManager import getGames
 
+class Menu:
+    def __init__(self):
+        pygame.init()
 
-def draw_text(screen,text, font, x, y):
-  screen.fill((255,255,255))
-  TEXT_COL = (0,0,0)
-  img = font.render(text, True, TEXT_COL)
-  screen.blit(img, (x, y))
-  
+        self.screen = pygame.display.set_mode((1280, 640))
+        self.font = pygame.font.SysFont("arialblack", 40)
 
+        self.clearScreen()
 
+        self.games = getGames()
+        self.selectedGame = 0
 
-def menu():
-  pygame.init()
-  screen = pygame.display.set_mode((1280,640))
-  color = (255, 255, 255)
-  screen.fill(color)
+    def drawText(self, text):
+        renderedText = self.font.render(text, True, (0,0,0))
+        renderedTextRect = renderedText.get_rect(center = (1280 / 2, 640 / 2))
 
-  run_menu = True
-  games = getGames()
-  current_game = games[0]
-  font = pygame.font.SysFont("arialblack", 40)
+        self.screen.blit(renderedText, (renderedTextRect))
 
+    def clearScreen(self):
+        self.screen.fill((255, 255, 255))
 
-  while run_menu: 
-      events = pygame.event.get()
-      keys = pygame.key.get_pressed()
+    def openLibrary(self):
+        return self.loop()
 
-      draw_text(screen,current_game,font,50,50)
+    def loop(self):
+        while True:
+            events = pygame.event.get()
+            keys = pygame.key.get_pressed()
 
-      for event in events:
-        if event.type == pygame.KEYDOWN:
-          if event.key == pygame.K_SPACE:
-            if games.index(current_game)+1 >= len(games):
-              current_game = games[0]
-            else :
-              current_game = games[games.index(current_game)+1]
+            self.clearScreen()
+            self.drawText(self.games[self.selectedGame])
 
-        if event.type == pygame.KEYDOWN:
-          if event.key == pygame.K_RETURN:
-            run_menu = False
-            return current_game
-          
-      pygame.display.flip()
-  
+            for event in events:
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    return False
 
-pygame.quit()
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_SPACE:
+                        if self.selectedGame == len(self.games) - 1:
+                            self.selectedGame = 0
+                        else :
+                            self.selectedGame += 1
+
+                    if event.key == pygame.K_RETURN:
+                        return self.games[self.selectedGame]
+                
+            pygame.display.flip()

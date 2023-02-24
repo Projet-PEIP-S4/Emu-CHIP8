@@ -1,28 +1,14 @@
-import traceback
-import time
-import random
-import os
+import time, random
+import os, sys, traceback
 
 # Disable pygame init print
 os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
-
 import pygame
 
-from utils.localDataManager import getGames, getGameFile
 from utils.displayManager import DisplayManager
+from utils.localDataManager import getGames, getGameFile
 
-from Menu import menu
-
-gameOn: bool = True # Control wether the game is running or not
-logging: bool = True # Set to True to enable logging message into console
-
-def log(log: str) -> None:
-    """
-        Wrapper around the print function to control console logging.
-    """
-
-    if logging:
-        print(log)
+from menu import Menu
 
 class Mem:
     """
@@ -41,8 +27,6 @@ class Mem:
         return Mem.instance
 
     def __init__(self):
-        log("New memory instance")
-        
         self.reset()
         self.loadFonts()
 
@@ -53,7 +37,10 @@ class Mem:
 
         self.mem = bytearray(4096) # Memory is composed of 4096 8-bit value
         self.dataOffset = 0x200 # A small part at the beginnig of the memory is reserved for fonts. Actual memory start at 0x200
+
         self.pc = self.dataOffset # Programm counter
+        self.instructionCode = "" # Plain text code instruction, used for debuging
+        self.incrementPC = True # Define whether or not the pc should be incremented
 
         self.fonts = [
             0xF0, 0x90, 0x90, 0x90, 0xF0, # 0
@@ -81,9 +68,6 @@ class Mem:
 
         self.i = 0 # General index register
 
-        self.instructionCode = "" # Plain text code instruction, used for debuging
-        self.incrementPC = True # Define whether or not the pc should be incremented
-
         self.st = 0 # Sound timer register
         self.dt = 0 # Delay timer register
 
@@ -106,7 +90,7 @@ class Mem:
             for index, value in enumerate(gameData):
                 self.mem[index + self.dataOffset] = value
         except Exception as e:
-            print("Memory overflow error.")
+            Emu.log("Memory overflow error.")
 
     def freezePC(self):
         self.incrementPC = False
@@ -139,9 +123,9 @@ class Mem:
     def __str__(self):
         allVarsFormated: str = ""
 
-        log("Mem class instance:")
+        Emu.log("Mem class instance:")
         for var in vars(self):
-            if var == "mem": continue
+            if var == "mem" or var == "fonts" or var == "dataOffset": continue
             allVarsFormated += "  -" + var + ": " + str(self.__dict__[var]) + "\n"
 
         return allVarsFormated
@@ -159,7 +143,17 @@ class CPU:
         return CPU.instance
 
     def __init__(self) -> None:
-        log("New CPU instance")
+        self.reset()
+
+    def reset(self) -> None:
+        """
+            Reset all variables to their default state.
+        """
+
+        self.code = 0
+        self.vx = 0
+        self.vy = 0
+        self.n = 0
 
         self.lookupTable = {
             0x0: self._0NNN,
@@ -225,18 +219,6 @@ class CPU:
             0xb: pygame.K_c,
             0xf: pygame.K_v,
         }
-
-        self.reset()
-
-    def reset(self) -> None:
-        """
-            Reset all variables to their default state.
-        """
-
-        self.code = 0
-        self.vx = 0
-        self.vy = 0
-        self.n = 0
 
     def decode(self, instruction : int):
         """
@@ -607,63 +589,134 @@ class CPU:
     def __str__(self) -> str:
         allVarsFormated: str = ""
 
-        log("CPU class instance:")
+        Emu.log("CPU class instance:")
         for var in vars(self):
-            if var == "lookupTable" or var == "fTable" or var == "hTable": continue
+            if var == "lookupTable" or var == "fTable" or var == "hTable" or var == "keyTable": continue
             allVarsFormated += "  -" + var + ": " + str(self.__dict__[var]) + "\n"
 
         return allVarsFormated
 
-def loop():
-    global gameOn
+class Emu:
+    instance: object | None = None
 
-    mem = Mem.getInstance()
-    cpu = CPU.getInstance()
-    dm = DisplayManager().getInstance()
+    @staticmethod
+    def getInstance() -> object:
+        """
+            Static function to allow to be used as a singleton.
+        """
 
-    timer = pygame.time.Clock()
+        if Emu.instance == None: Emu.instance = Emu()
+        return Emu.instance
 
-    i = 0
-    while gameOn:
-        # Get the current instruction to execute
-        instruction = mem.getCurrentInstruction()
+    def __init__(self):
+        self.reset()
 
-        # log(mem.instructionCode)
+        self.mem = Mem.getInstance() # Init Mem class
+        self.cpu = CPU.getInstance() # Init CPU class
+        self.dm = DisplayManager().getInstance() # Init the display class
 
-        # Tell the CPU to decode the instruction
-        cpu.decode(instruction)
-        
-        # Execute the instruction
-        cpu.exec()
+    @staticmethod
+    def log(log: str) -> None:
+        """
+            Wrapper around the print function to control console logging.
+        """
 
-        # Increment the pc if needed
-        mem.updatePC()
+        if Emu.getInstance().logging:
+            print(log)
 
-        # Update the screen
-        dm.update()
+    def reset(self):
+        self.logging = False # Set to True to enable logging message into console
+        self.gameData = False
+        self.gameOn = False
 
-        if i == 9: # Timers decrement at 60hz, 540 / 9 = 60
-            mem.decrementTimers()
-            i = 0
+    def setRom(self, rom):
+        self.gameData = rom
 
-        i += 1
-        timer.tick(540)
+    def play(self):
+        if self.gameData == False:
+            print("No game ROM has been provided")
+            return
+
+        self.mem.fillMemory(self.gameData)
+
+        self.dm.invertColors()
+        self.dm.openDisplay()
+
+        self.timer = pygame.time.Clock()
+
+        self.gameOn = True
+
+        try: # Enable global error handling
+            self.loop()
+        except Exception: # If an error occur print: the error code, the Mem vars content and the CPU vars content
+            self.log("\n" + traceback.format_exc())
+
+            self.log(Mem.getInstance())
+            self.log(CPU.getInstance())
+
+    def loop(self):
+        i = 0
+        while self.gameOn:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    self.gameOn = False
+
+                    pygame.quit()
+                    break
+
+            # Get the current instruction to execute
+            instruction = self.mem.getCurrentInstruction()
+
+            # Tell the CPU to decode the instruction
+            self.cpu.decode(instruction)
+            
+            # Execute the instruction
+            self.cpu.exec()
+
+            # Increment the pc if needed
+            self.mem.updatePC()
+
+            # Update the screen
+            self.dm.update()
+
+            if i == 9: # Timers decrement at 60hz, 540 / 9 = 60
+                self.mem.decrementTimers()
+                i = 0
+
+            i += 1
+            self.timer.tick(540)
+
+def printHowToUse():
+    print("Emu-CHIP8\n")
+
+    print("How to use:")
+    print("- no arg --> use the library to select your game")
+    print("- game name --> bypass the menu and jump directly to the game")
+    print("\n- help --> acces this menu")
 
 def main():
-    game_name = menu()
-    fileData = getGameFile(game_name)
-    
-    Mem.getInstance().fillMemory(fileData)
-    CPU.getInstance() # Init CPU class
+    emu = Emu.getInstance()
+    emu.logging = True
 
-    display = DisplayManager.getInstance() # Init display
+    if len(sys.argv) == 2:
+        gameName = sys.argv[1]
 
-    loop()
+        if gameName in getGames():
+            gameRom = getGameFile(gameName)
 
-try: # Enable global error handling
-    main()
-except Exception: # If an error occur print: the error code, the Mem vars content and the CPU vars content
-    print("\n" + traceback.format_exc())
+            emu.setRom(gameRom)
+            emu.play()
+        else:
+            print("Game does not exist !")
+    elif len(sys.argv) > 2:
+        printHowToUse()
+    else:
+        gameName = Menu().openLibrary()
 
-    log(Mem.getInstance())
-    log(CPU.getInstance())
+        if gameName == False:
+            print("Bye")
+        else:
+            emu.setRom(getGameFile(gameName))
+            emu.play()
+
+main()
