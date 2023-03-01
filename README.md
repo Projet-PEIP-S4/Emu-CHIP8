@@ -3,6 +3,7 @@
 ## Requierements
 
 Use python Mypy for types checking
+Use pygame module for game screen
 
 ```properties
 pip install mypy
