@@ -621,7 +621,7 @@ class Emu:
             Wrapper around the print function to control console logging.
         """
 
-        if Emu.getInstance().logging:
+        if Emu.getInstance().logging == True:
             print(log)
 
     def reset(self):
@@ -705,7 +705,6 @@ def printListGames():
 
 def main():
     emu = Emu.getInstance()
-    emu.logging = True
 
     if len(sys.argv) == 2:
         firstParam = sys.argv[1]
